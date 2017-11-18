@@ -1,24 +1,19 @@
 <lcgdict>
-  <class name="tbeam::Event" ClassVersion="3">
-  <!--  <version ClassVersion="1" checksum="3429877205" />-->
-  <!-- <version ClassVersion="2" checksum="1722052690" />-->
-  <version ClassVersion="3" checksum="2452638373" />
-</class>
-  <class name="tbeam::dutEvent" ClassVersion="1" persistent="true" >
-  <version ClassVersion="1" checksum="184679944" />
-</class>
-  <class name="tbeam::condEvent" ClassVersion="1" persistent="true" >
-  <version ClassVersion="1" checksum="985055904" />
-</class>
+  <class name="tbeam::Event" ClassVersion="1">
+    <version ClassVersion="1" checksum="7081648" />
+  </class>
   <class name="tbeam::cbc" ClassVersion="1" presistent="true" >
-  <version ClassVersion="1" checksum="468624910" />
-</class>
+    <version ClassVersion="1" checksum="1391251423" />
+  </class>
   <class name="tbeam::cluster" ClassVersion="1" persistent="true" >
-  <version ClassVersion="1" checksum="549055367" />
-</class>
+    <version ClassVersion="1" checksum="1165179472" />
+  </class>
   <class name="tbeam::stub" ClassVersion="1" persistent="true" >
-  <version ClassVersion="1" checksum="3197177963" />
-</class>
+    <version ClassVersion="1" checksum="3949290573" />
+  </class>
+  <class name="tbeam::hit" ClassVersion="1" persistent="true" >
+    <version ClassVersion="1" checksum="1435770401" />
+  </class>
   <class name="std::vector<tbeam::cluster>" persistent="true"/>
   <class name="std::vector<tbeam::cluster*>" persistent="true"/>
   <class name="std::vector<tbeam::stub>" persistent="true" />
@@ -28,6 +23,9 @@
   <class name="std::vector<tbeam::stub*>" persistent="true" />
   <class name="std::map<std::string, std::vector<int> >" persistent="true" /> 
   <class name="std::map<std::string, std::vector<unsigned short> >" persistent="true" />
-  <class name="std::vector<std::vector<Phase2TrackerCommissioningDigi> >" persistent="true" />
-  <class name="edm::Wrapper<std::vector<std::vector<Phase2TrackerCommissioningDigi> > >" persistent="true" />
+  <class name="std::vector<tbeam::hit>" persistent="true" />
+  <class name="std::map<std::string,std::vector<tbeam::hit>>" persistent="true" />
+  <class name="std::map<std::string,std::vector<tbeam::cluster>>" persistent="true" />
+  <class name="std::map<std::string,std::vector<tbeam::stub>>" persistent="true" />
+  <class name="std::map<std::string, std::vector<tbeam::cbc> >" persistent="true" />
 </lcgdict>

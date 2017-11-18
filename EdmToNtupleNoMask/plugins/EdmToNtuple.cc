@@ -12,25 +12,30 @@
 // Author:  Ali Harb, Suvankar Roy Chowdhury, Martin Delcourt, Nicolas Chanon, Kirill Skovpen
 // 
 //
+#include "EventFilter/Phase2TrackerRawToDigi/interface/Phase2TrackerFEDBuffer.h"
+#include "EventFilter/Phase2TrackerRawToDigi/interface/Phase2TrackerFEDHeader.h"
 
 #include "DataFormats/Common/interface/DetSetVector.h"
 #include "DataFormats/Common/interface/DetSetVectorNew.h"
 #include "DataFormats/SiPixelDigi/interface/PixelDigiCollection.h"
 #include "DataFormats/SiPixelCluster/interface/SiPixelCluster.h"
 
-#include "DataFormats/Phase2TrackerDigi/interface/Phase2TrackerDigi.h"
-#include "DataFormats/Phase2TrackerDigi/interface/Phase2TrackerCommissioningDigi.h"
 #include "DataFormats/FEDRawData/interface/FEDRawDataCollection.h"
 #include "DataFormats/FEDRawData/src/fed_header.h"
 
-#include "EventFilter/Phase2TrackerRawToDigi/interface/Phase2TrackerFEDBuffer.h"
-#include "EventFilter/Phase2TrackerRawToDigi/interface/Phase2TrackerFEDHeader.h"
+#include "DataFormats/Phase2TrackerDigi/interface/Phase2TrackerDigi.h"
+#include "DataFormats/Phase2TrackerDigi/interface/Phase2TrackerCommissioningDigi.h"
+#include "DataFormats/Phase2TrackerDigi/interface/Phase2TrackerCommissioningDigi.h"
+#include "DataFormats/Phase2TrackerDigi/interface/Phase2TrackerDigi.h"
+#include "DataFormats/Phase2TrackerDigi/interface/Phase2TrackerHeaderDigi.h"
+#include "DataFormats/Phase2TrackerDigi/interface/Phase2TrackerStub.h"
+#include "DataFormats/Phase2TrackerCluster/interface/Phase2TrackerCluster1D.h"
 
 #include "TestBeamAnalysis/EdmToNtupleNoMask/plugins/EdmToNtuple.h"
 #include<vector>
 #include<algorithm>
 #include<iomanip>
-
+#include<bitset>
 using namespace Phase2Tracker;
 
 CbcConfig::CbcConfig(uint32_t cwdWord, uint32_t windowWord){
@@ -46,9 +51,13 @@ CbcConfig::CbcConfig(uint32_t cwdWord, uint32_t windowWord){
 
 EdmToNtupleNoMask::EdmToNtupleNoMask(const edm::ParameterSet& iConfig) :
   verbosity_(iConfig.getUntrackedParameter<int>("verbosity", 0)),
-  nCBC_(iConfig.getUntrackedParameter<int>("numCBC", 2)),
-  nStripsPerCBC_(iConfig.getUntrackedParameter<int>("numStripsPerCbc", 127))
+  fedrawdataToken_(consumes<FEDRawDataCollection>(iConfig.getParameter<edm::InputTag>("fedRawData"))),
+  unsparsifiedDigiToken_(consumes<edm::DetSetVector<Phase2TrackerDigi>>(iConfig.getParameter<edm::InputTag>("unsparisifiedDigiColl"))),
+  sparsifiedClusterToken_(consumes<edmNew::DetSetVector<Phase2TrackerCluster1D>>(iConfig.getParameter<edm::InputTag>("cluster1DColl"))),
+  stubToken_(consumes<edmNew::DetSetVector<Phase2TrackerStub>>(iConfig.getParameter<edm::InputTag>("stubColl"))),
+  isSparisifiedMode_(iConfig.getParameter<bool>("isSparsified"))
 {
+
   std::vector<int> detId(iConfig.getParameter< std::vector<int> >("detIdVec"));
   std::vector<std::string> detNames(iConfig.getParameter< std::vector<std::string> >("detNamesVec"));
   if( detId.empty() || detId.size() != detNames.size() ) {
@@ -64,346 +73,239 @@ EdmToNtupleNoMask::EdmToNtupleNoMask(const edm::ParameterSet& iConfig) :
     for( auto& e: detIdNamemap_ )
       std::cout << e.first << "=" << e.second << std::endl;
    
-  std::string stemp = iConfig.getParameter<std::string>("tdcAddress");
-  tdcAdd_= std::stoul(stemp, nullptr, 16);
-  stemp = iConfig.getParameter<std::string>("hvAddress");
-  hvAdd_ = std::stoul(stemp, nullptr, 16);
-  stemp = iConfig.getParameter<std::string>("dutAngAddress");
-  DUTangAdd_ = std::stoul(stemp, nullptr, 16);
-  stemp = iConfig.getParameter<std::string>("stubAddress");
-  stubAdd_ = std::stoul(stemp, nullptr, 16);
-  
-  stemp = iConfig.getParameter<std::string>("cwdAddress");
-  cwdAdd_ = std::stoul(stemp, nullptr, 16);
-  stemp = iConfig.getParameter<std::string>("offsetAddress");
-  offsetAdd_ = std::stoul(stemp, nullptr, 16);
-  stemp = iConfig.getParameter<std::string>("windowAddress");
-  windowAdd_ = std::stoul(stemp, nullptr, 16);
-  stemp = iConfig.getParameter<std::string>("tiltAddress");
-  tiltAdd_ = std::stoul(stemp, nullptr, 16);
-
-  stemp = iConfig.getParameter<std::string>("vcthAddress");
-  vcthAdd_ = std::stoul(stemp, nullptr, 16);
-
-  stemp = iConfig.getParameter<std::string>("stubLatencyAddress");
-  stubLatencyAdd_ = std::stoul(stemp, nullptr, 16);
-  stemp = iConfig.getParameter<std::string>("triggerLatencyAddress");
-  triggerLatencyAdd_ = std::stoul(stemp, nullptr, 16);
-
-  if(verbosity_) {
-    std::cout << "tdcPhase Address=" << tdcAdd_ << std::endl;
-    std::cout << "HVsettings Address=" << hvAdd_ << std::endl;
-    std::cout << "DUT angle Address=" << DUTangAdd_ << std::endl;
-    std::cout << "stub Address=" << stubAdd_ << std::endl;
-  }
 }
 
 void EdmToNtupleNoMask::beginJob()
 {
-  cEvent_ = new tbeam::condEvent();
-  dEvent_ = new tbeam::dutEvent();
+  //ev_ = new tbeam::Event();
   edm::Service<TFileService> fs;
   fs->file().cd("/");
   tree_ = fs->make<TTree>("tbeamTree", "AnalysisTree no mask");
   //ev is a dummy variable of type tbeam::Event
-  tree_->Branch("DUT",&dEvent_);
-  tree_->Branch("Condition",&cEvent_);
+  tree_->Branch("Event",&ev_);
 }
 
 void EdmToNtupleNoMask::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 {
-  tbeam::Event evtInfo;
-  tbeam::condEvent cev;
-  tbeam::dutEvent dev;
   // event info
-  cev.run = iEvent.id().run();
-  cev.event = iEvent.id().event();  
-  cev.lumiSection = iEvent.luminosityBlock();
+  ev_.run = iEvent.id().run();
+  ev_.event = iEvent.id().event();  
+  ev_.lumiSection = iEvent.luminosityBlock();
   edm::Timestamp itime = iEvent.time();
-  cev.time = itime.value();
-  cev.unixtime = itime.unixTime();
-
-   edm::Handle<FEDRawDataCollection> buffers;
-   iEvent.getByLabel("rawDataCollector",buffers);
-   
-   size_t fedIndex;
-   for( fedIndex = Phase2Tracker::FED_ID_MIN; fedIndex < Phase2Tracker::CMS_FED_ID_MAX; ++fedIndex )
-     {
-	const FEDRawData& fed = buffers->FEDData(fedIndex);
-	if(fed.size()!=0)
-	  {
-	     // construct buffer
-	     Phase2Tracker:: Phase2TrackerFEDBuffer* buffer = 0;
-	     buffer = new Phase2Tracker::Phase2TrackerFEDBuffer(fed.data(),fed.size());
-	     Phase2TrackerFEDHeader tr_header = buffer->trackerHeader();
-	     
-	     if(verbosity_)
-	       {		  
-		  std::cout << " buffer size : " << buffer->bufferSize() << std::endl;
-		  std::cout << " fed id      : " << fedIndex << std::endl;
-		  std::cout << " Version  : " << std::hex << std::setw(2) << (int) tr_header.getDataFormatVersion() << std::endl;
-		  std::cout << " Mode     : " << std::hex << std::setw(2) << tr_header.getDebugMode() << std::endl;
-		  std::cout << " Type     : " << std::hex << std::setw(2) << (int) tr_header.getEventType() << std::endl;
-		  std::cout << " Readout  : " << std::hex << std::setw(2) << tr_header.getReadoutMode() << std::endl;
-		  std::cout << " Condition Data : " << ( tr_header.getConditionData() ? "Present" : "Absent") << "\n";
-		  std::cout << " Data Type      : " << ( tr_header.getDataType() ? "Real" : "Fake" ) << "\n";
-		  std::cout << " Status   : " << std::hex << std::setw(16) << (int) tr_header.getGlibStatusCode() << std::endl;
-	       }	     
-	     
-	     cev.condData = tr_header.getConditionData();
-	     cev.glibStatus = (int) tr_header.getGlibStatusCode();
-
-	     if(verbosity_)
-	       {		  
-		  std::cout << " Nr CBC   : " << std::hex << std::setw(16) << (int) tr_header.getNumberOfCBC() << std::endl;
-		  std::cout << " CBC stat : ";
-		  for( int i=0;i<tr_header.getNumberOfCBC();i++ )
-		    {
-		       std::cout << std::hex << std::setw(2) << (int) tr_header.CBCStatus()[i] << " " << std::endl;
-		    }	     
-	   }	     
-        for( int i=0;i<tr_header.getNumberOfCBC();i++ ){
-           tbeam::cbc c;
-           c.pipelineAdd =  0;
-           c.status      =  tr_header.CBCStatus()[i];
-           c.error       =  0;
-           cev.cbcs.push_back(c);
-        }
-	     
-	     delete buffer;
-	  }	
-     }   
-   
-   edm::Handle < std::vector<std::vector<Phase2TrackerCommissioningDigi> > > conditions;
-   iEvent.getByLabel("Phase2TrackerCommissioningDigiProducer", "ConditionData",  conditions);
-   if( !conditions.isValid() ) 
-     {
-	std::cout << "condition data not found" << std::endl;
-	exit(1);
-     }   
-   std::vector<std::vector<Phase2TrackerCommissioningDigi> >::const_iterator i_detSet;
-   std::vector<Phase2TrackerCommissioningDigi>::const_iterator j_detSet;
-   
-   for(i_detSet = conditions->begin(); i_detSet != conditions->end(); ++i_detSet)
-     {
-	for(j_detSet = i_detSet->begin(); j_detSet != i_detSet->end(); ++j_detSet)
-	  {	
-	     uint32_t key = j_detSet->getKey();
-	     uint32_t value = j_detSet->getValue();
-	   
-	     if(verbosity_)
-	       {
-		  std::cout << "Found key " << std::hex << key << " with value " << std::dec << value << std::endl;
-	       }	     
-	     
-	     if(key == tdcAdd_) 
-	       {
-		  cev.tdcPhase = value;
-		  if(verbosity_) std::cout << "It corresponds to the TDC key" << std::endl;
-	       }	     
-	     else if(key == hvAdd_) 
-	       {
-		  cev.HVsettings = value;
-		  if(verbosity_) std::cout << "It corresponds to the HV key" << std::endl;
-	       }	     
-	     else if(key == DUTangAdd_) 
-	       {
-		  cev.DUTangle = value;
-		  if(verbosity_) std::cout << "It corresponds to DUT angle key" << std::endl;
-	       }	     
-	     else if(key == tiltAdd_) 
-	       {
-		  cev.tilt = value;
-		  if(verbosity_) std::cout << "It corresponds to the DUT tilt key" << std::endl;
-	       }	     
-	     else if(key == cwdAdd_) 
-	       {
-		  cev.cwd = value;
-		  if(verbosity_) std::cout << "It corresponds to the cwd key" << std::endl;
-	       }	     
-	     else if(key == windowAdd_) 
-	       {
-		  cev.window = value;
-		  if(verbosity_) std::cout << "It corresponds to the cluster window key" << std::endl;
-	       }	     
-	     else if(key == vcthAdd_) 
-	       {
-		  cev.vcth = value;
-		  if(verbosity_) std::cout << "It corresponds to the VCTH key" << std::endl;
-	       }	     
-	     else if(key == offsetAdd_) 
-	       {
-		  cev.offset = value;
-		  if(verbosity_) std::cout << "It corresponds to DUT angle key" << std::endl;
-	       }	     
-	     else if(key == stubAdd_) 
-	       {
-		  dev.stubWord = value;
-		  if(verbosity_) std::cout << "It corresponds to the stub word key" << std::endl;
-	       }	     
-        else if (key == stubLatencyAdd_){
-          cev.stubLatency = value;
-          if(verbosity_) std::cout << "It corresponds to the stub latency key" << std::endl;
-           }
-        else if (key == triggerLatencyAdd_)
-           {
-          cev.triggerLatency = value;
-          if(verbosity_) std::cout << "It corresponds to the trigger latency key" << std::endl;                                              
-         }
-	  }
-     }
-   
-   
-   
-   edm::Handle< edm::DetSetVector<Phase2TrackerDigi> > input;
-   iEvent.getByLabel( "Phase2TrackerDigiProducer", "Unsparsified", input);
- 
-   if( !input.isValid() )
-     {
-	std::cout << "Phase2TrackerDigiProducer not found" << std::endl;
-	exit(1);	
-     }   
-   
-   cbcConfiguration = CbcConfig(cev.cwd,cev.window);
-
-   edm::DetSetVector<Phase2TrackerDigi>::const_iterator it;
-   // loop over modules  
-   std::vector < int >processedDetId;
-   dev.stubWordReco=0;
-   for(it = input->begin() ; it != input->end(); ++it)
-     {
-	      int detId = it->id;
-         processedDetId.push_back(detId);
-	      if(verbosity_) std::cout << "Module " << std::dec << detId << " ---------- " << std::endl;
-	
-	      // loop over hits in the module
-	      for(edm::DetSet<Phase2TrackerDigi>::const_iterator hit = it->begin();
-	         hit!=it->end(); hit++ )
-	      {
-	         if(verbosity_) std::cout << "channel=" << hit->channel() << " " << hit->row() << std::endl;
-
-	         dev.dut_channel[detIdNamemap_[detId]].push_back(hit->channel());
-	         dev.dut_row[detIdNamemap_[detId]].push_back(hit->row());
-	      }
-         dev.clusters[detIdNamemap_[detId]] = clusterizer(dev.dut_channel[detIdNamemap_[detId]]);
-         if (std::find(processedDetId.begin(), processedDetId.end(), detId-4) != processedDetId.end()){
-            if(verbosity_) std::cout << "Event=" << cev.event << " Stub Production with seeding detId=" << detId-4 << " && matching detId=" << detId << std::endl;
-            //dev.stubs=stubSimulator(&dev.clusters[detIdNamemap_[detId-4]],&dev.clusters[detIdNamemap_[detId]]);
-            dev.stubs=stubSimulator(&dev.clusters[detIdNamemap_[detId]],&dev.clusters[detIdNamemap_[detId-4]]);
-            dev.stubWordReco=stubWordGenerator(dev.stubs);
-         }
-     }
-   
-
-
-   edm::Handle< edmNew::DetSetVector<SiPixelCluster> > inputCluster;
-   iEvent.getByLabel( "Phase2TrackerDigiProducer", "Sparsified", inputCluster);
-   
-   if( !inputCluster.isValid() )
-     {
-	std::cout << "Phase2TrackerDigiProducer not found" << std::endl;
-	exit(1);	
-     }   
-
-   edmNew::DetSetVector<SiPixelCluster>::const_iterator itc;
-   for( itc=inputCluster->begin();itc!=inputCluster->end();itc++ )
-     {
-//	uint32_t detid = itc->id();
-     }
-//   if (evtInfo.stubs.size()>0) std::cout<<evtInfo.stubs.at(0)->cluster0->x<<std::endl;
-   /*if (evtInfo.stubWord!=evtInfo.stubWordReco){
-      std::cout<<"S : "<<evtInfo.stubWord<<"- Reco : "<<evtInfo.stubWordReco<<std::endl;
-      for (unsigned int i=0; i<evtInfo.dut_channel["det0"].size(); i++){std::cout<<evtInfo.dut_channel["det0"].at(i)<<"-";}
-      std::cout<<std::endl;
-      for (unsigned int i=0; i<evtInfo.dut_channel["det1"].size(); i++){std::cout<<evtInfo.dut_channel["det1"].at(i)<<"-";}
-      std::cout<<std::endl;
-   }*/
-   ev = evtInfo;
-   ev.DUT = dev;
-   cEvent_ = &cev;
-   dEvent_ = &dev;  
-   tree_->Fill();
+  ev_.time = itime.value();
+  ev_.unixtime = itime.unixTime();
+  //Tracker Header
+  edm::Handle<FEDRawDataCollection> buffers;
+  iEvent.getByToken(fedrawdataToken_,buffers);
+  size_t fedIndex;
+  for( fedIndex = Phase2Tracker::FED_ID_MIN; fedIndex < Phase2Tracker::CMS_FED_ID_MAX; ++fedIndex ) {
+    const FEDRawData& fed = buffers->FEDData(fedIndex);
+    if(fed.size()==0) continue;
+    // construct buffer
+    Phase2Tracker::Phase2TrackerFEDBuffer buffer(fed.data(),fed.size());
+    std::cout << " buffer size : " << buffer.bufferSize() << std::endl;
+    std::cout << " fed id      : " << fedIndex << std::endl;
+    printHeader(buffers);
+    //Fill info in object
+    Phase2TrackerHeaderDigi tr_header = Phase2TrackerHeaderDigi(buffer.trackerHeader());
+    ev_.dataFormatVersion = tr_header.getDataFormatVersion();
+    ev_.debugMode = tr_header.getDebugMode();
+    ev_.readoutMode = tr_header.getReadoutMode();
+    ev_.dataType = tr_header.getDataType();
+    ev_.glibStatusCode = tr_header.getGlibStatusCode();
+    ev_.numberOfCBC = tr_header.getNumberOfCBC();   
+    //loop over condition data
+    ev_.conddatamap = buffer.conditionData();
+    for(auto& it : buffer.conditionData()){ 
+      uint8_t uid     = (it.first >> 24)  & MASK_BITS_8;
+      //The following can be saved if necessary
+      //uint8_t i2cReg  = (it.first >> 16)  & MASK_BITS_8;
+      //uint8_t i2cPage = (it.first >> 12)  & MASK_BITS_4;
+      //uint8_t roId    = (it.first >> 8)   & MASK_BITS_4;
+      //uint8_t feId    = (it.first)        & MASK_BITS_8;
+      if(uid == 1)       ev_.vcth = (int)it.second;
+      else if(uid == 3)  ev_.tdcPhase =  (int)it.second;  
+      else if(uid == 5)  ev_.HVsettings = (int)it.second;  
+      else if(uid == 4)  ev_.DUTangle = (int)it.second;  
+    }
+  }
+  //IF unsparisified read channel data!!Otherwise read clusters
+  if(!isSparisifiedMode_) {
+    //Unspasified Data
+    edm::Handle< edm::DetSetVector<Phase2TrackerDigi> > usp_digi_detset;
+    iEvent.getByToken(unsparsifiedDigiToken_, usp_digi_detset);
+    printDigi(usp_digi_detset);
+    for(auto& det : *usp_digi_detset) {
+      std::vector<tbeam::hit> temphits;
+      for(auto& hit : det) {
+        temphits.emplace_back(tbeam::hit(hit.row(), hit.column(), hit.strip(), hit.edge(),
+                                         hit.channel(), hit.overThreshold()) );
+      }
+      ev_.dutHits.insert({std::to_string(det.id), temphits});
+      std::vector<tbeam::cluster> tempclus;
+      offlineclusterizer(temphits, ev_.numberOfCBC, 127, tempclus);
+      ev_.offlineClusters.insert({std::to_string(det.id), tempclus});
+      std::cout << "**********Offline Clustesr************" << std::endl;
+      std::cout << "Detid=" << det.id << std::endl;
+      for(auto& c : tempclus) {
+        std::cout << "fStrip:" << std::setw(8)<< c.firstStrip
+                  << " size:" << std::setw(8)<< c.size
+                  << " center:" << std::setw(8)<< c.center()
+        << std::endl;
+      }
+      std::cout << "**********Offline Clustesr************" << std::endl;
+    }
+  } else {
+    //Cluster 1D
+    edm::Handle< edmNew::DetSetVector<Phase2TrackerCluster1D> > sp_cluster1D_detset;
+    iEvent.getByToken(sparsifiedClusterToken_, sp_cluster1D_detset);
+    for(auto& det : *sp_cluster1D_detset) {
+      std::cout << "DetId:" << det.id() << std::endl;
+      std::vector<tbeam::cluster> tempclus;
+      for(auto& hit : det) {
+        tempclus.emplace_back( tbeam::cluster( hit.firstStrip(), hit.firstRow(),
+                                               hit.edge(), hit.column(),
+                                               hit.size() ) );
+      }
+      ev_.cbcClusters.insert({std::to_string(det.id()), tempclus});
+    }
+  }
+  //get stub info
+  edm::Handle< edmNew::DetSetVector<Phase2TrackerStub> > stub_detset;
+  iEvent.getByToken(stubToken_, stub_detset);
+  for(auto& det : *stub_detset) {
+    std::vector<tbeam::stub> tmpstubs;
+    for(auto& hit : det) {
+      tmpstubs.emplace_back( tbeam::stub( hit.getPositionX(), hit.getPositionY(), hit.getBend() ) );
+    }
+    ev_.cbcStubs.insert( { std::to_string(det.id()), tmpstubs } );
+  }
+  tree_->Fill();
+  ev_.reset();
 }
 
+void EdmToNtupleNoMask::printHeader(const edm::Handle<FEDRawDataCollection>& buffers) {
+  for(size_t  fedIndex = Phase2Tracker::FED_ID_MIN; fedIndex < Phase2Tracker::CMS_FED_ID_MAX; ++fedIndex ) {
+    const FEDRawData& fed = buffers->FEDData(fedIndex);
+    if(fed.size()==0) continue;
+    // construct buffer
+    Phase2Tracker::Phase2TrackerFEDBuffer buffer(fed.data(),fed.size());
+    std::cout << " buffer size : " << buffer.bufferSize() << std::endl;
+    std::cout << " fed id      : " << fedIndex << std::endl;
+    //Read Tracker Header Data
+    std::cout << "******Tracker Header information Start*****" << std::endl;
+    Phase2TrackerHeaderDigi tr_header = Phase2TrackerHeaderDigi(buffer.trackerHeader());
+    std::cout << " Version  : " << std::hex << std::setw(2) << (int) tr_header.getDataFormatVersion() << std::endl;
+    std::cout << " Debug Mode     : " << std::hex << std::setw(2) << (int)tr_header.getDebugMode() << std::endl;
+    std::cout << " Readout Mode : " << std::hex << std::setw(2) << (int)tr_header.getReadoutMode() << std::endl;
+    std::cout << " Data Type     : " << std::hex << std::setw(2) << (int) tr_header.getDataType() << std::endl;
+    std::cout << " Condition Data : " << std::hex << std::bitset<8>(tr_header.getConditionData()) << "\n";
+    std::cout << " Data Type  : " << ( tr_header.getDataType() ? "Real" : "Fake" ) << "\n";
+    std::cout << " Glib Status   : " << std::hex << std::setw(2) << (int) tr_header.getGlibStatusCode() << std::endl;
+    std::cout << " No. of CBC   : " << std::hex << std::setw(2) << (int) tr_header.getNumberOfCBC() << std::endl;
+    std::cout << "******Tracker Header information End*******" << std::endl;
+
+    //print condition data
+    std::cout << "******Tracker Condition Data information Start*****" << std::endl;
+    std::map<uint32_t,uint32_t> conddata_map = buffer.conditionData();
+    for(auto& it : conddata_map){ 
+      uint8_t uid     = (it.first >> 24)  & MASK_BITS_8;
+      uint8_t i2cReg  = (it.first >> 16)  & MASK_BITS_8;
+      uint8_t i2cPage = (it.first >> 12)  & MASK_BITS_4;
+      uint8_t roId    = (it.first >> 8)   & MASK_BITS_4;
+      uint8_t feId    = (it.first)        & MASK_BITS_8;
+      std::cout <<  std::hex << "key: "      << it.first
+                <<  " uid: "     << std::setw(8) << (int)uid  
+                <<  " i2cReg: "  << std::setw(8) << (int)i2cReg  
+                <<  " i2cPage: " << std::setw(8) << (int)i2cPage  
+                <<  " roId: "    << std::setw(8) << (int)roId 
+                <<  " feId: "    << std::setw(8) << (int)feId  
+                << std::hex << " value: "   << it.second << " (hex) "
+                << std::dec                 << it.second << " (dec) " << std::endl;
+    } 
+    std::cout << "******Tracker Condition Data information End*******" << std::endl;
+  }
+}
+void EdmToNtupleNoMask::printDigi(const edm::Handle< edm::DetSetVector<Phase2TrackerDigi> >& usp_digi_detset){
+    //if(usp_digi_detset)  std::cout << "Unsparsified digi collection present!!" << std::endl;
+    std::cout << "******Tracker Unsparsified Data Start*******" << std::endl;
+    for(auto& det : *usp_digi_detset) {
+      std::cout << "DetId:" << det.id << std::endl;
+      for(auto& hit : det) {
+	std::cout << "channel=" << std::setw(4) << hit.channel() 
+		  << "  row=" << std::setw(4) << hit.row() 
+		  << "  column=" << std::setw(4) << hit.column() 
+		  << "  strip=" << std::setw(4) << hit.strip() 
+		  << "  edge=" << std::setw(4) << hit.edge()
+		  << "  overThreshold=" << std::setw(2) << hit.overThreshold() 
+		  << std::endl;
+      }
+    }
+    std::cout << "******Tracker Unsparsified Data End*********" << std::endl;
+}
+void EdmToNtupleNoMask::printClus1D(const edm::Handle< edmNew::DetSetVector<Phase2TrackerCluster1D> >& sp_cluster1D_detset) {
+    //if(sp_cluster1D_detset)  std::cout << "Cluster 1D collection present!!" << std::endl;
+    std::cout << "******Tracker Cluster1D Data Start*******" << std::endl;
+    for(auto& det : *sp_cluster1D_detset) {
+      std::cout << "DetId:" << det.id() << std::endl;
+      for(auto& hit : det) {
+	std::cout << "FStrip="  << std::setw(4) << hit.firstStrip() 
+		  << " FRow="   << std::setw(4) << hit.firstRow() 
+		  << " Edge="   << std::setw(4) << hit.edge() 
+		  << " Column=" << std::setw(4) << hit.column() 
+		  << " Size="   << std::setw(6) << (int) hit.size() 
+		  << " Threshold=" << std::setw(6) << (int) hit.threshold() 
+		  << " Center="    << std::setw(4) << hit.center() 
+		  << " Barycenter(" << std::setw(4) << hit.barycenter().first << "," << hit.barycenter().second << ")" 
+		  << std::endl; 
+      }
+    }
+    std::cout << "******Tracker Cluster1D Data End*********" << std::endl;
+}
+void EdmToNtupleNoMask::printStub(const edm::Handle< edmNew::DetSetVector<Phase2TrackerStub> >& stub_detset){
+  std::cout << "******Tracker Stub Data Start*******" << std::endl;
+  for(auto& det : *stub_detset) {
+    std::cout << "DetId:" << det.id() << std::endl;
+    for(auto& hit : det) {
+      std::cout << "PosX="   << std::setw(8) << (int) hit.getPositionX()
+                << " PosY="   << std::setw(8) << (int) hit.getPositionY() 
+                << " Bend="   << std::setw(6) <<  hit.getBend() 
+                << std::endl;
+    }
+  }
+  std::cout << "******Tracker Stub Data End*********" << std::endl;
+}
+
+void EdmToNtupleNoMask::offlineclusterizer(const std::vector<tbeam::hit>& hits, const unsigned int nCbc,
+                                           const unsigned int nStripsPerCBC, std::vector<tbeam::cluster>& clusVec ){
+  if (hits.empty())  return; 
+  unsigned int fStrip = hits.at(0).strip;//get strip of first hit
+  unsigned int ftRow  = hits.at(0).row;
+  unsigned int ed     = hits.at(0).edge;
+  unsigned int col    = hits.at(0).column;
+  unsigned int size=1;
+  unsigned int edge = -1;
+  if (nCbc==16) edge = 8*nStripsPerCBC;
+  for (unsigned int i = 1; i < hits.size(); i++){
+    if (hits.at(i).strip == fStrip + size && !(hits.at(i).strip == edge)){
+      size++;
+    }
+    else{
+      tbeam::cluster clust(fStrip, ftRow, ed, col, size);
+      clusVec.push_back(clust);
+      size=1;
+      fStrip = hits.at(i).strip;//get strip of first hit
+      ftRow  = hits.at(i).row;
+      ed     = hits.at(i).edge;
+      col    = hits.at(i).column;
+    }  
+  }       
+  tbeam::cluster clust(fStrip, ftRow, ed, col, size);
+  clusVec.push_back(clust);
+}
 void EdmToNtupleNoMask::endJob()
 {
+  //delete ev_;
 }
-
-bool EdmToNtupleNoMask::sortEvent( const tbeam::Event& a,  const tbeam::Event& b) {
-  return a.time < b.time;
-}
-
-std::vector < tbeam::cluster *> EdmToNtupleNoMask::clusterizer ( std::vector <int> hits){
-   sort(hits.begin(),hits.end());
-   std::vector < tbeam::cluster * > toReturn;
-    if (hits.size()<1){
-        return(toReturn);
-    }
-    float x0=hits.at(0);
-    int size=1;
-    int edge = -1;
-    if (nCBC_==16) edge = 8*nStripsPerCBC_;
-    for (unsigned int i=1; i<hits.size(); i++){
-        if (hits.at(i)==x0+size && !(hits.at(i)==edge)){
-            size++;
-        }
-        else{
-            tbeam::cluster * clust = new tbeam::cluster();
-            clust->x  = x0+(size-1)/2.;
-            clust->size = size;
-            //clust->stubs = std::vector <tbeam::stub *>();
-            toReturn.push_back(clust);
-            x0=hits.at(i);
-            size=1;
-        }   
-    }       
-   tbeam::cluster * clust = new tbeam::cluster();
-   clust->x       = x0+(size-1)/2.;
-   clust->size    = size;
-   //clust->stubs   = std::vector <tbeam::stub *>();
-   toReturn.push_back(clust);
-   return(toReturn);
-}
-
-std::vector<tbeam::stub*> EdmToNtupleNoMask::stubSimulator (std::vector < tbeam::cluster *> * seeding, std::vector < tbeam::cluster *> * matching){
-    int CBCSIZE = 127;
-    std::vector <tbeam::stub* > stubs;
-    for (std::vector<tbeam::cluster*>::iterator seed=seeding->begin(); seed!=seeding->end(); seed++){
-        if ((*seed)->size<=cbcConfiguration.CWD){
-           int offset;
-           if ((*seed)->x < CBCSIZE/2)  offset  = cbcConfiguration.offset1;
-           else                         offset  = cbcConfiguration.offset2;
-            for(std::vector<tbeam::cluster*>::iterator match = matching->begin(); match!=matching->end(); match++){
-                if ((*match)->size<cbcConfiguration.CWD && abs((int)(*match)->x-(int)(*seed)->x+offset)<=cbcConfiguration.window){
-                   tbeam::stub * s = new tbeam::stub;
-                   s->x          = (int)(*seed)->x;
-                   s->direction  = (int)(*match)->x-(int)(*seed)->x;
-                   s->seeding    = *seed;
-                   s->matched    = *match;
-                   stubs.push_back(s); 
-                   //(*seed)->stubs.push_back(s);
-                   //(*match)->stubs.push_back(s);
-                }
-            }
-        }
-    }
-    return(stubs);
-}
-
-uint32_t EdmToNtupleNoMask::stubWordGenerator(std::vector <tbeam::stub*> stubs){
-   uint32_t stubWord=0;
-    int CBCSIZE = 127;
-   for (std::vector<tbeam::stub*>::iterator stub=stubs.begin(); stub!=stubs.end(); stub++){
-      for (int k=7; k>=0; k--){
-         if ((int)(*stub)->seeding->x >= k*CBCSIZE){
-            stubWord = stubWord | (int)1<<k;
-            break;
-         }
-      }
-   }
-   return (stubWord);
-}
-
 //define this as a plug-in
 DEFINE_FWK_MODULE(EdmToNtupleNoMask);
-

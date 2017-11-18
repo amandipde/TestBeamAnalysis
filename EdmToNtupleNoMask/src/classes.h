@@ -1,7 +1,8 @@
-#include "TestBeamAnalysis/EdmToNtupleNoMask/interface/AnalysisObjects.h"
-
-#include "DataFormats/Common/interface/DetSetVector.h"
-#include "DataFormats/Phase2TrackerDigi/interface/Phase2TrackerCommissioningDigi.h"
+#include "TestBeamAnalysis/EdmToNtupleNoMask/interface/Event.h"
+#include "TestBeamAnalysis/EdmToNtupleNoMask/interface/Hit.h"
+#include "TestBeamAnalysis/EdmToNtupleNoMask/interface/Cbc.h"
+#include "TestBeamAnalysis/EdmToNtupleNoMask/interface/Cluster.h"
+#include "TestBeamAnalysis/EdmToNtupleNoMask/interface/Stub.h"
 
 #include <vector>
 namespace {
@@ -10,12 +11,14 @@ struct dictionary {
  tbeam::Event rv1;
  std::vector<tbeam::Event> vrv1;
  std::map<std::string, std::vector< tbeam::cluster *> > msvpfi;
+ tbeam::hit  h;
+ std::vector<tbeam::hit>  vh;
+ std::map<std::string,std::vector<tbeam::hit>>  mvh;
+
  tbeam::cluster  cp;
  tbeam::cluster *cpp;
  tbeam::stub s;
  tbeam::cbc c;
- tbeam::dutEvent  dE;
- tbeam::condEvent cE;
  std::vector< tbeam::stub > vs;
  std::vector< tbeam::cbc > vc;
  std::vector< tbeam::cluster> vcl;
@@ -25,7 +28,6 @@ struct dictionary {
  std::vector<unsigned short> vrvs;
  std::map< std::string,std::vector<int> >  msvi;
  std::map< std::string,std::vector<unsigned short> > msvs;
- std::vector<std::vector<Phase2TrackerCommissioningDigi> > mdigi;
- edm::Wrapper<std::vector<std::vector<Phase2TrackerCommissioningDigi> > > vdigi;
+ std::map<std::string, std::vector<tbeam::cbc> > mcbc;
 };
 }

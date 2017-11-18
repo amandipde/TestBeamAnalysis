@@ -15,6 +15,11 @@ treeMaker = cms.EDAnalyzer("EdmToNtupleNoMask",
    vcthAddress = cms.string("0x010c0100"),
    stubLatencyAddress = cms.string("0x09000000"),
    triggerLatencyAddress = cms.string("0x01010100"),
-   numCBC = cms.untracked.int32(2)
+   numCBC = cms.untracked.int32(2),
+   isSparsified = cms.bool(False),
+   fedRawData = cms.InputTag("rawDataCollector"),
+   unsparisifiedDigiColl = cms.InputTag("Phase2TrackerDigiProducerTestBeam","Unsparsified"),
+   cluster1DColl = cms.InputTag("Phase2TrackerDigiProducerTestBeam", "Sparsified"),
+   stubColl = cms.InputTag("Phase2TrackerStubProducer", "Stubs" )
 )
 
