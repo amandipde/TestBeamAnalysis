@@ -4,16 +4,14 @@
 namespace tbeam {
   class cbc : public TObject {
   public:
-    cbc() : pipelineAdd(999), status(99), error(99) {}
-    cbc(const uint16_t pAdd, const uint8_t stat, const uint8_t err) :
-      pipelineAdd(pAdd), 
-      status(stat), 
-      error(err)
-    {}
+    cbc() :  chipdebugstatus(99), error(99), pipelineAdd(99), l1ID(99) {}
+    cbc(const uint32_t cdebugstatus, const uint16_t err, const uint16_t pAdd, const uint16_t  l1):
+      chipdebugstatus(99), error(99), pipelineAdd(99), l1ID(99) {}
     virtual ~cbc(){}
+    uint32_t chipdebugstatus;
+    uint16_t error;
     uint16_t pipelineAdd;
-    uint8_t status;
-    uint8_t error;
+    uint16_t  l1ID;
     ClassDef(cbc,1)
       };
 }

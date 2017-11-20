@@ -128,6 +128,26 @@ void EdmToNtupleNoMask::analyze(const edm::Event& iEvent, const edm::EventSetup&
       else if(uid == 5)  ev_.HVsettings = (int)it.second;  
       else if(uid == 4)  ev_.DUTangle = (int)it.second;  
     }
+    //get cbc status
+    std::cout << "***************Printing CBC status*********\n";
+    std::cout << "FEDIdx=" << fedIndex << "\tStatusSize:" << buffer.trackerHeader().CBCStatus().size() << std::endl;
+    //for (std::vector<Phase2TrackerFEDFEDebug>::iterator FE_it = buffer.trackerHeader().CBCStatus().begin(); 
+    //     FE_it < buffer.trackerHeader().CBCStatus().end(); FE_it++) {
+    for (unsigned int fi = 0; fi < buffer.trackerHeader().CBCStatus().size(); fi++) { 
+      Phase2TrackerFEDFEDebug& FE_it = buffer.trackerHeader().CBCStatus()[fi];
+      if(FE_it.IsOn()) {
+        //std::cout << "\t"   <<  std::hex << std::setw(4) 
+        //          << FE_it.getFEL1ID()[0] 
+        //          << " " << FE_it.getFEL1ID()[1]
+        //          << std::endl;
+        std::vector<tbeam::cbc> tempCbc;
+        for (int ci=0; ci<tr_header.getNumberOfCBC(); ci++) {
+          tempCbc.emplace_back(tbeam::cbc(FE_it.getChipDebugStatus(ci), FE_it.getChipError(ci),
+                                          FE_it.getChipPipelineAddress(ci), FE_it.getChipL1ID(ci)) ); 
+        }
+      }
+    }
+    std::cout << "***************Printing CBC status*********\n";
   }
   //IF unsparisified read channel data!!Otherwise read clusters
   if(!isSparisifiedMode_) {

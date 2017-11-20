@@ -47,7 +47,7 @@ namespace tbeam {
     uint32_t triggerLatency;
 
     std::map<uint32_t,uint32_t > conddatamap;//this is kept for now.If not used in offline analysis, it can be dropped
-    std::map<std::string,std::vector<tbeam::cbc> > cbcs;
+    std::map<unsigned int,std::vector<tbeam::cbc> > cbcs;
     std::map< std::string,std::vector<tbeam::hit> > dutHits;//
     std::map< std::string, std::vector<tbeam::cluster> > cbcClusters;//only in sparsified mode
     std::map<std::string, std::vector<tbeam::stub>> cbcStubs;//
