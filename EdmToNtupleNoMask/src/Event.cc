@@ -131,4 +131,10 @@ void tbeam::Event::dumpEvent(std::ostream& os) {
     for(auto& stub : detS.second) os << std::dec << stub;
   }
   os << "******Tracker CBC offline Data End*********" << std::endl;
+
+  os << "******Track Data(Should be Empty if DUT only Ntuple!!!)*******" << std::endl;
+  for(auto& tk : tracks) {
+    os << tk;
+  }
+  os << "******Track Data(Should be Empty if DUT only Ntuple!!!)*******" << std::endl;
 }

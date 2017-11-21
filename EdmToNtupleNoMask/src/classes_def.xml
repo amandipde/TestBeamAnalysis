@@ -1,6 +1,6 @@
 <lcgdict>
   <class name="tbeam::Event" ClassVersion="1">
-    <version ClassVersion="1" checksum="3599716099" />
+    <version ClassVersion="1" checksum="4225426268" />
   </class>
   <class name="tbeam::cbc" ClassVersion="1" presistent="true" >
     <version ClassVersion="1" checksum="379666194" />
@@ -13,6 +13,9 @@
   </class>
   <class name="tbeam::hit" ClassVersion="1" persistent="true" >
     <version ClassVersion="1" checksum="1691815339" />
+  </class>
+  <class name="tbeam::Track" ClassVersion="1" persistent="true" >
+    <version ClassVersion="1" checksum="489579332" />
   </class>
   <class name="std::vector<tbeam::cluster>" persistent="true"/>
   <class name="std::vector<tbeam::cluster*>" persistent="true"/>
@@ -29,4 +32,5 @@
   <class name="std::map<std::string,std::vector<tbeam::stub>>" persistent="true" />
   <class name="std::map<std::string, std::vector<tbeam::cbc> >" persistent="true" />
   <class name="std::map<unsigned int, std::vector<tbeam::cbc> >" persistent="true" />
+  <class name="std::vector<tbeam::Track>" persistent="true" />
 </lcgdict>

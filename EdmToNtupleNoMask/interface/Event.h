@@ -11,6 +11,7 @@
 #include "Hit.h"
 #include "Cbc.h"
 #include "Stub.h"
+#include "Track.h"
 namespace tbeam {
   class Event :  public TObject {
   public:
@@ -54,6 +55,10 @@ namespace tbeam {
     std::map<std::string, std::vector<tbeam::stub>> cbcStubs;//
     std::map< std::string, std::vector<tbeam::cluster> > offlineClusters;//only in unsparsified mode
     std::map< std::string, std::vector<tbeam::stub> > offlineStubs;//created from offlineClusters or cbcClusters
+    //At the ntuplizer stage this is a empty
+    //This vector of tracks is defined here to avoid redifining Event class in offline analysis
+    //This vector will be filled in Merge step of Telescope Ntuple + EdmNtuple
+    std::vector<tbeam::Track>  tracks;
     ClassDef(Event,1)
       };
 }

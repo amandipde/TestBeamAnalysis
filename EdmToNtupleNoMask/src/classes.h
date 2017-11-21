@@ -3,6 +3,7 @@
 #include "TestBeamAnalysis/EdmToNtupleNoMask/interface/Cbc.h"
 #include "TestBeamAnalysis/EdmToNtupleNoMask/interface/Cluster.h"
 #include "TestBeamAnalysis/EdmToNtupleNoMask/interface/Stub.h"
+#include "TestBeamAnalysis/EdmToNtupleNoMask/interface/Track.h"
 
 #include <vector>
 namespace {
@@ -29,5 +30,7 @@ struct dictionary {
  std::map< std::string,std::vector<int> >  msvi;
  std::map< std::string,std::vector<unsigned short> > msvs;
  std::map<std::string, std::vector<tbeam::cbc> > mcbc;
+ tbeam::Track tk;
+ std::vector<tbeam::Track>  vtk;
 };
 }
