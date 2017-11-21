@@ -1,18 +1,18 @@
 <lcgdict>
   <class name="tbeam::Event" ClassVersion="1">
-    <version ClassVersion="1" checksum="519821669" />
+    <version ClassVersion="1" checksum="3599716099" />
   </class>
   <class name="tbeam::cbc" ClassVersion="1" presistent="true" >
-    <version ClassVersion="1" checksum="1699275138" />
+    <version ClassVersion="1" checksum="379666194" />
   </class>
   <class name="tbeam::cluster" ClassVersion="1" persistent="true" >
-    <version ClassVersion="1" checksum="1165179472" />
+    <version ClassVersion="1" checksum="2096935818" />
   </class>
   <class name="tbeam::stub" ClassVersion="1" persistent="true" >
     <version ClassVersion="1" checksum="3949290573" />
   </class>
   <class name="tbeam::hit" ClassVersion="1" persistent="true" >
-    <version ClassVersion="1" checksum="1435770401" />
+    <version ClassVersion="1" checksum="1691815339" />
   </class>
   <class name="std::vector<tbeam::cluster>" persistent="true"/>
   <class name="std::vector<tbeam::cluster*>" persistent="true"/>

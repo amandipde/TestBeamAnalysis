@@ -47,24 +47,21 @@ class EdmToNtupleNoMask : public edm::one::EDAnalyzer<>
   const int verbosity_;
   void offlineclusterizer(const std::vector<tbeam::hit>& hits, const unsigned int nCbc,
                           const unsigned int nChanPercbc, std::vector<tbeam::cluster>& clusVec);
-  //uint32_t stubWordGenerator(std::vector <tbeam::stub*> stubs);
-  //std::vector <tbeam::stub*> stubSimulator(std::vector<tbeam::cluster *> * seeding, std::vector< tbeam::cluster *> *matching);
-  void printHeader(const edm::Handle<FEDRawDataCollection>& );
-  void printDigi(const edm::Handle< edm::DetSetVector<Phase2TrackerDigi> >&); 
-  void printClus1D(const edm::Handle< edmNew::DetSetVector<Phase2TrackerCluster1D> >&);
-  void printStub(const edm::Handle< edmNew::DetSetVector<Phase2TrackerStub> >&);
-
+  void stubSimulator (const std::vector<tbeam::cluster>& seeding, const std::vector<tbeam::cluster>& matching, std::vector<tbeam::stub>& stubVec);
+  //variables passed from config
   const edm::EDGetTokenT<FEDRawDataCollection> fedrawdataToken_;
   const edm::EDGetTokenT<edm::DetSetVector<Phase2TrackerDigi>>  unsparsifiedDigiToken_;
   const edm::EDGetTokenT<edmNew::DetSetVector<Phase2TrackerCluster1D>>  sparsifiedClusterToken_;
   const edm::EDGetTokenT<edmNew::DetSetVector<Phase2TrackerStub>>       stubToken_;
+  std::vector<std::string> detIdBottomVec_;
+  std::vector<std::string> detIdTopVec_;
   const bool isSparisifiedMode_;
-
+  
+  //variables of the ntuplizer
   TTree* tree_;
-  std::vector<tbeam::Event> v_evtInfo_;
   tbeam::Event ev_;
   CbcConfig cbcConfiguration; 
-  std::map<int,std::string> detIdNamemap_;
+
   uint32_t tdcAdd_;
   uint32_t hvAdd_;
   uint32_t DUTangAdd_;      
